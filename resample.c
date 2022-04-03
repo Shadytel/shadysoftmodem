@@ -3,13 +3,7 @@
 
 #include "resample.h"
 
-/*
-#define PHASES 5
-#define PHASE_INCREMENT 6
-#define SAMPLES_PER_PHASE 175
-
-int32_t taps_9k6hz_8hz[PHASES][SAMPLES_PER_PHASE] = 
-    {
+int32_t taps_9k6hz_8khz[] = 
        {     0,      0,      0,      0,      0,      0,      0,      0,
              0,      0,      0,      0,      0,      1,     -1,      1,
              0,     -1,      3,     -4,      4,     -1,     -3,      8,
@@ -31,8 +25,9 @@ int32_t taps_9k6hz_8hz[PHASES][SAMPLES_PER_PHASE] =
            -21,     12,     -1,     -7,     11,    -10,      5,      0,
             -4,      5,     -4,      1,      0,     -2,      2,     -1,
              0,      0,      0,      0,      0,      0,      0,      0,
-             0,      0,      0,      0,      0,      0,      0},
-       {     0,      0,      0,      0,      0,      0,      0,      0,
+             0,      0,      0,      0,      0,      0,      0,
+
+             0,      0,      0,      0,      0,      0,      0,      0,
              0,      0,      0,      0,      0,      1,     -1,      1,
              0,     -2,      3,     -3,      1,      1,     -6,      8,
             -8,      2,      5,    -14,     18,    -14,      2,     14,
@@ -53,8 +48,9 @@ int32_t taps_9k6hz_8hz[PHASES][SAMPLES_PER_PHASE] =
            -17,      4,      7,    -13,     12,     -7,      1,      4,
             -6,      5,     -3,      0,      2,     -2,      2,      0,
              0,      0,     -1,      0,      0,      0,      0,      0,
-             0,      0,      0,      0,      0,      0,      0},
-       {     0,      0,      0,      0,      0,      0,      0,      0,
+             0,      0,      0,      0,      0,      0,      0,
+
+             0,      0,      0,      0,      0,      0,      0,      0,
              0,      0,      0,      0,     -1,      1,     -1,      0,
              1,     -3,      3,     -2,      0,      4,     -7,      7,
             -3,     -3,     10,    -15,     14,     -5,     -8,     22,
@@ -75,8 +71,9 @@ int32_t taps_9k6hz_8hz[PHASES][SAMPLES_PER_PHASE] =
             -8,     -5,     14,    -15,     10,     -3,     -3,      7,
             -7,      4,      0,     -2,      3,     -3,      1,      0,
             -1,      1,     -1,      0,      0,      0,      0,      0,
-             0,      0,      0,      0,      0,      0,      0},
-       {     0,      0,      0,      0,      0,      0,      0,      0,
+             0,      0,      0,      0,      0,      0,      0,
+
+             0,      0,      0,      0,      0,      0,      0,      0,
              0,      0,      0,      0,     -1,      0,      0,      0,
              2,     -2,      2,      0,     -3,      5,     -6,      4,
              1,     -7,     12,    -13,      7,      4,    -17,     25,
@@ -97,8 +94,9 @@ int32_t taps_9k6hz_8hz[PHASES][SAMPLES_PER_PHASE] =
              2,    -14,     18,    -14,      5,      2,     -8,      8,
             -6,      1,      1,     -3,      3,     -2,      0,      1,
             -1,      1,      0,      0,      0,      0,      0,      0,
-             0,      0,      0,      0,      0,      0,      0},
-       {     0,      0,      0,      0,      0,      0,      0,      0,
+             0,      0,      0,      0,      0,      0,      0,
+
+             0,      0,      0,      0,      0,      0,      0,      0,
              0,      0,      0,      0,      0,      0,      0,     -1,
              2,     -2,      0,      1,     -4,      5,     -4,      0,
              5,    -10,     11,     -7,     -1,     12,    -21,     22,
@@ -119,8 +117,7 @@ int32_t taps_9k6hz_8hz[PHASES][SAMPLES_PER_PHASE] =
             13,    -20,     17,     -8,     -1,      8,    -10,      8,
             -3,     -1,      4,     -4,      3,     -1,      0,      1,
             -1,      1,      0,      0,      0,      0,      0,      0,
-             0,      0,      0,      0,      0,      0,      0}};
-*/
+             0,      0,      0,      0,      0,      0,      0};
 
 int32_t taps_9k6hz_16khz[] = 
        {     0,      0,      0,      0,      0,      1,      0,     -3,
@@ -183,15 +180,24 @@ int32_t taps_9k6hz_16khz[] =
             45,    -10,    -31,     -6,     14,      8,     -4,     -6,
              0,      2,      0,      0,      0,      0,      0,      0};
 
-void resamp_9k6hz_16khz_init(ResamplerState * state) {
+static void resamp_init(ResamplerState * state, int32_t * taps,
+    size_t phases, size_t phaseIncrement, size_t samplesPerPhase) {
     memset(state, 0, sizeof(state));
     state->historyIdx = 0;
     state->phase = 0;
-    state->phases = 5;
-    state->phaseIncrement = 3;
-    state->samplesPerPhase = 88;
-    state->taps = taps_9k6hz_16khz;
-    state->history = calloc(state->samplesPerPhase, sizeof(int16_t));
+    state->phases = phases;
+    state->phaseIncrement = phaseIncrement;
+    state->samplesPerPhase = samplesPerPhase;
+    state->taps = taps;
+    state->history = calloc(samplesPerPhase, sizeof(int16_t));
+}
+
+void resamp_9k6hz_8khz_init(ResamplerState * state) {
+    resamp_init(state, taps_9k6hz_8khz, 5, 6, 175);
+}
+
+void resamp_9k6hz_16khz_init(ResamplerState * state) {
+    resamp_init(state, taps_9k6hz_16khz, 5, 3, 88);
 }
 
 size_t resample(ResamplerState * state, int16_t * in, size_t inCount,
