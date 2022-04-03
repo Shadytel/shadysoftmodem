@@ -1,4 +1,15 @@
 #include <stdint.h>
 
-void resamp_8khz_9k6hz_init();
-size_t resamp_8khz_9k6hz(int16_t * in, size_t inCount, int16_t * out, size_t maxOut);
+typedef struct {
+    int32_t * taps;
+    int16_t * history;
+    size_t historyIdx;
+    size_t samplesPerPhase;
+    size_t phase;
+    size_t phases;
+    size_t phaseIncrement;
+} ResamplerState;
+
+void resamp_9k6hz_16khz_init(ResamplerState * state);
+size_t resample(ResamplerState * state, int16_t * in, size_t inCount,
+    int16_t * out, size_t maxOut);

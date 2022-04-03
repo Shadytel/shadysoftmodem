@@ -1,12 +1,14 @@
 #include <string.h>
+#include <malloc.h>
 
 #include "resample.h"
 
+/*
 #define PHASES 5
 #define PHASE_INCREMENT 6
 #define SAMPLES_PER_PHASE 175
 
-int32_t taps[PHASES][SAMPLES_PER_PHASE] = 
+int32_t taps_9k6hz_8hz[PHASES][SAMPLES_PER_PHASE] = 
     {
        {     0,      0,      0,      0,      0,      0,      0,      0,
              0,      0,      0,      0,      0,      1,     -1,      1,
@@ -118,42 +120,103 @@ int32_t taps[PHASES][SAMPLES_PER_PHASE] =
             -3,     -1,      4,     -4,      3,     -1,      0,      1,
             -1,      1,      0,      0,      0,      0,      0,      0,
              0,      0,      0,      0,      0,      0,      0}};
+*/
 
-typedef struct {
-    int16_t history[SAMPLES_PER_PHASE];
-    size_t historyIdx;
-    size_t phase;
-} ResamplerState;
+int32_t taps_9k6hz_16khz[] = 
+       {     0,      0,      0,      0,      0,      1,      0,     -3,
+            -4,      3,     11,      0,    -20,    -15,     25,     44,
+           -13,    -81,    -31,    106,    116,    -87,   -228,    -14,
+           322,    220,   -321,   -506,    139,    787,    285,   -908,
+          -943,    676,   1714,    108,  -2355,  -1631,   2473,   4196,
+         -1314,  -9332,  -5348,  87464, -19340,   5210,   7117,    275,
+         -3855,  -1769,   1784,   1981,   -389,  -1586,   -418,    968,
+           732,   -381,   -700,    -31,    489,    236,   -243,   -270,
+            52,    207,     52,   -116,    -83,     40,     69,      2,
+           -40,    -17,     16,     16,     -2,     -9,     -2,      3,
+             2,      0,     -1,      0,      0,      0,      0,      0,
 
-ResamplerState state;
+             0,      0,      0,      0,      0,      0,     -1,     -3,
+             0,      7,      3,    -12,    -16,     11,     36,      4,
+           -57,    -45,     61,    111,    -23,   -183,    -80,    220,
+           254,   -158,   -459,    -57,    606,    448,   -563,   -958,
+           192,   1434,    607,  -1621,  -1856,   1171,   3494,    467,
+         -5531,  -5021,   9321,  47619,   5432,  12866,   2817,  -4508,
+         -3306,   1378,   2736,    240,  -1809,   -964,    879,   1088,
+          -159,   -862,   -264,    508,    413,   -182,   -372,    -32,
+           244,    127,   -111,   -132,     18,     92,     26,    -47,
+           -35,     14,     25,      2,    -13,     -6,      4,      4,
+             0,     -2,      0,      0,      0,      0,      0,      0,
 
-void resamp_8khz_9k6hz_init() {
-    memset(state.history, 0, sizeof(state.history));
-    state.historyIdx = 0;
-    state.phase = 0;
+             0,      0,      0,      0,      0,      0,     -2,      0,
+             4,      4,     -6,    -13,      2,     25,     14,    -35,
+           -47,     26,     92,     18,   -132,   -111,    127,    244,
+           -32,   -372,   -182,    413,    508,   -264,   -862,   -159,
+          1088,    879,   -964,  -1809,    240,   2736,   1378,  -3306,
+         -4508,   2817,  12866,   5432,  47619,   9321,  -5021,  -5531,
+           467,   3494,   1171,  -1856,  -1621,    607,   1434,    192,
+          -958,   -563,    448,    606,    -57,   -459,   -158,    254,
+           220,    -80,   -183,    -23,    111,     61,    -45,    -57,
+             4,     36,     11,    -16,    -12,      3,      7,      0,
+            -3,     -1,      0,      0,      0,      0,      0,      0,
+
+             0,      0,      0,      0,      0,     -1,      0,      2,
+             3,     -2,     -9,     -2,     16,     16,    -17,    -40,
+             2,     69,     40,    -83,   -116,     52,    207,     52,
+          -270,   -243,    236,    489,    -31,   -700,   -381,    732,
+           968,   -418,  -1586,   -389,   1981,   1784,  -1769,  -3855,
+           275,   7117,   5210, -19340,  87464,  -5348,  -9332,  -1314,
+          4196,   2473,  -1631,  -2355,    108,   1714,    676,   -943,
+          -908,    285,    787,    139,   -506,   -321,    220,    322,
+           -14,   -228,    -87,    116,    106,    -31,    -81,    -13,
+            44,     25,    -15,    -20,      0,     11,      3,     -4,
+            -3,      0,      1,      0,      0,      0,      0,      0,
+
+             0,      0,      0,      0,      0,      0,      0,      2,
+             0,     -6,     -4,      8,     14,     -6,    -31,    -10,
+            45,     47,    -42,   -103,      0,    158,    100,   -171,
+          -253,     90,    419,    128,   -509,   -489,    407,    922,
+             0,  -1265,   -769,   1281,   1859,   -665,  -3118,  -1001,
+          4303,   4785,  -5152, -20089, 103763, -20089,  -5152,   4785,
+          4303,  -1001,  -3118,   -665,   1859,   1281,   -769,  -1265,
+             0,    922,    407,   -489,   -509,    128,    419,     90,
+          -253,   -171,    100,    158,      0,   -103,    -42,     47,
+            45,    -10,    -31,     -6,     14,      8,     -4,     -6,
+             0,      2,      0,      0,      0,      0,      0,      0};
+
+void resamp_9k6hz_16khz_init(ResamplerState * state) {
+    memset(state, 0, sizeof(state));
+    state->historyIdx = 0;
+    state->phase = 0;
+    state->phases = 5;
+    state->phaseIncrement = 3;
+    state->samplesPerPhase = 88;
+    state->taps = taps_9k6hz_16khz;
+    state->history = calloc(state->samplesPerPhase, sizeof(int16_t));
 }
 
-size_t resamp_8khz_9k6hz(int16_t * in, size_t inCount, int16_t * out, size_t maxOut) {
+size_t resample(ResamplerState * state, int16_t * in, size_t inCount,
+    int16_t * out, size_t maxOut) {
     while (inCount--) {
-        state.history[state.historyIdx++] = *in++;
-        if (state.historyIdx >= SAMPLES_PER_PHASE) {
-            state.historyIdx = 0;
+        state->history[state->historyIdx++] = *in++;
+        if (state->historyIdx >= state->samplesPerPhase) {
+            state->historyIdx = 0;
         }
 
-        while (state.phase < PHASES && maxOut--) {
+        while (state->phase < state->phases && maxOut--) {
             int32_t acc = 0;
-            size_t cti = state.historyIdx;
-            for (size_t tapIndex = 0; tapIndex < SAMPLES_PER_PHASE; tapIndex++) {
-                acc += state.history[cti] * taps[state.phase][tapIndex];
-                if (++cti >= SAMPLES_PER_PHASE) {
+            size_t cti = state->historyIdx;
+            for (size_t tapIndex = 0; tapIndex < state->samplesPerPhase; tapIndex++) {
+                acc += state->history[cti] *
+                  state->taps[state->phase * state->samplesPerPhase + tapIndex];
+                if (++cti >= state->samplesPerPhase) {
                     cti = 0;
                 }
             }
             *out++ = acc >> 16;
-            state.phase += PHASE_INCREMENT;
+            state->phase += state->phaseIncrement;
         }
 
-        state.phase -= PHASES;
+        state->phase -= state->phases;
     }
 
     return maxOut;
