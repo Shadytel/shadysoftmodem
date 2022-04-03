@@ -31,7 +31,6 @@ int main(int argc, char *argv[]) {
         FD_ZERO(&err_fds);
 
         FD_SET(0, &in_fds);
-        FD_SET(2, &in_fds);
         FD_SET(3, &in_fds);
 
         FD_SET(1, &out_fds);
@@ -45,10 +44,24 @@ int main(int argc, char *argv[]) {
             return -1;
         }
 
+        fprintf(logFile, "select() returned:\n");
+        for (int i = 0; i < 5; i++) {
+            if (FD_ISSET(i, &in_fds)) {
+                fprintf(logFile, "fd %d is ready to read\n", i);
+            }
+        }
+
+        for (int i = 0; i < 5; i++) {
+            if (FD_ISSET(i, &err_fds)) {
+                fprintf(logFile, "fd %d is exceptional\n", i);
+                return -2;
+            }
+        }
+
         if (FD_ISSET(0, &in_fds)) {
             len = read(0, buf, sizeof(buf));
             if (len <= 0) {
-                return -2;
+                return -3;
             }
             fwrite(buf, 1, len, logFile);
             for (int i = 0; i < len; i++) {
@@ -60,16 +73,11 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (FD_ISSET(2, &in_fds)) {
-            len = read(2, buf, sizeof(buf));
-            // Ignore errors
-        }
-
         // Echo audio back
         if (FD_ISSET(3, &in_fds)) {
             len = read(3, buf, sizeof(buf));
             if (len <= 0) {
-                return -2;
+                return -4;
             }
             write(4, buf, len);
         }
