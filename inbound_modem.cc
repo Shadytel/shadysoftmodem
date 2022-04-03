@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
         }
 
         // Echo audio back
-        if (FD_ISSET(3, &in_fds) && FD_ISSET(4, &out_fds)) {
+        if (FD_ISSET(3, &in_fds)) {
             len = read(3, buf, sizeof(buf));
             if (len <= 0) {
                 return -2;
