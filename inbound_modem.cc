@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
             FD_SET(i, &err_fds);
         }
         
-        if (select(5, &in_fds, &out_fds, &err_fds, NULL) <= 0) {
+        if (select(5, &in_fds, NULL, &err_fds, NULL) <= 0) {
             return -1;
         }
 
