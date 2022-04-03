@@ -12,6 +12,7 @@ typedef struct {
 
 void resamp_9k6hz_8khz_init(ResamplerState * state);
 void resamp_9k6hz_16khz_init(ResamplerState * state);
+void resamp_16khz_9k6hz_init(ResamplerState * state);
 
 size_t resample(ResamplerState * state, int16_t * in, size_t inCount,
     int16_t * out, size_t maxOut);
