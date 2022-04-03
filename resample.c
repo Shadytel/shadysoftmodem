@@ -264,6 +264,7 @@ int32_t taps_16khz_9k6hz[] =
             0,     2,     0,    -1,     1,     0,    -1,     0,     1,
             0,     0,     0,     0,     0,     0,     0,     0,     0,
             0,     0,     0,     0,     0,     0,     0,     0,     0};
+
 static void resamp_init(ResamplerState * state, int32_t * taps,
     size_t phases, size_t phaseIncrement, size_t samplesPerPhase) {
     memset(state, 0, sizeof(state));
