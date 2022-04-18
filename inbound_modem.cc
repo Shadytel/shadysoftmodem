@@ -1,8 +1,89 @@
-#include <iostream>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/select.h>
 #include <unistd.h>
+
+#include <iostream>
 #include <string>
+
+extern "C" {
+#define delete _delete
+#include "modem.h"
+#undef delete
+}
+
+#include "resample.h"
+
+typedef struct {
+    ResamplerState in_resamp_state;
+    ResamplerState out_resamp_state;
+} ExtModModem;
+
+FILE *logFile;
+
+static int yate_extmod_modem_start(struct modem *m)
+{
+    return 0;
+}
+
+static int yate_extmod_modem_stop(struct modem *m)
+{
+    return 0;
+}
+
+static int yate_extmod_modem_ioctl(struct modem *m, unsigned int cmd, unsigned long arg)
+{
+	ExtModModem * t = (ExtModModem *)m->dev_data;
+	//DBG("modem_test_ioctl: cmd %x, arg %lx...\n",cmd,arg);
+    switch (cmd) {
+    case MDMCTL_CAPABILITIES:
+        return -1;
+    case MDMCTL_HOOKSTATE:
+    case MDMCTL_SPEED:
+    case MDMCTL_GETFMTS:
+    case MDMCTL_SETFMT:
+    case MDMCTL_SETFRAGMENT:
+    case MDMCTL_SPEAKERVOL:
+		return 0;
+    case MDMCTL_CODECTYPE:
+        return CODEC_UNKNOWN;
+    case MDMCTL_IODELAY:
+		return 0; // FIXME?
+    default:
+        return 0;
+    }
+}
+
+struct modem_driver yate_extmod_modem_driver = {
+        .name = "YATE External Module Modem Driver",
+        .start = yate_extmod_modem_start,
+        .stop = yate_extmod_modem_stop,
+        .ioctl = yate_extmod_modem_ioctl,
+};
+
+int create_pty() {
+    struct termios termios;
+    int pty;
+
+    pty = getpt();
+    if (pty < 0 || grantpt(pty) < 0 || unlockpt(pty) < 0) {
+        fprintf(logFile, "Error creating pty: %s\n", strerror(errno));
+        return errno;
+    }
+
+    tcgetattr(pty, &termios);
+    cfmakeraw(&termios);
+    cfsetispeed(&termios, B115200);
+    cfsetospeed(&termios, B115200);
+
+    if (tcsetattr(pty, TCSANOW, &termios)) {
+        fprintf(logFile, "Error creating pty in tcsetattr: %s\n",
+            strerror(errno));
+        return errno;
+    }
+
+    return 0;
+}
 
 void process_msg(std::string & in_msg) {
     size_t id_begin_idx;
@@ -21,7 +102,6 @@ int main(int argc, char *argv[]) {
     fd_set out_fds;
     fd_set err_fds;
     std::string in_msg;
-    FILE *logFile;
 
     logFile = fopen("/tmp/inbound_modem_dbg.log", "wt");
 
