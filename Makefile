@@ -4,8 +4,8 @@ RESAMPLE_OBJS = resample.o
 
 MODEM_PATH=pkg-sl-modem/modem
 
-CFLAGS += -Wall -g -O -I. -DCONFIG_DEBUG_MODEM -m32
-CXXFLAGS += $(CFLAGS) -I$(MODEM_PATH)
+CFLAGS += -Wall -g -O -I. -I$(MODEM_PATH) -DCONFIG_DEBUG_MODEM -m32
+CXXFLAGS += $(CFLAGS)
 
 MODEM_OBJS := \
 	$(MODEM_PATH)/modem.o \
@@ -21,8 +21,8 @@ MODEM_OBJS := \
 
 DP_OBJS := $(MODEM_PATH)/dp_sinus.o $(MODEM_PATH)/dp_dummy.o
 SYSDEP_OBJS := $(MODEM_PATH)/sysdep_common.o
-ALL_OBJS := $(MODEM_PATH)/modem_cmdline.o $(MODEM_OBJS) $(DP_OBJS) \
-	$(MODEM_PATH)/dsplibs.o $(SYSDEP_OBJS) $(RESAMPLE_OBJS)
+ALL_COMPILED_OBJS := $(MODEM_PATH)/modem_cmdline.o $(MODEM_OBJS) $(DP_OBJS) \
+	$(SYSDEP_OBJS) $(RESAMPLE_OBJS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $^
@@ -30,5 +30,11 @@ ALL_OBJS := $(MODEM_PATH)/modem_cmdline.o $(MODEM_OBJS) $(DP_OBJS) \
 %.o: %.cc
 	$(CC) $(CXXFLAGS) -c -o $@ $^
 
-inbound_modem: inbound_modem.o $(ALL_OBJS)
+inbound_modem: inbound_modem.o $(MODEM_PATH)/dsplibs.o $(ALL_COMPILED_OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
+
+clean:
+	rm -f inbound_modem inbound_modem.o $(ALL_COMPILED_OBJS)
+.PHONY:
+	clean
+
