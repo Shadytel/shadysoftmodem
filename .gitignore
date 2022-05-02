@@ -33,3 +33,6 @@
 
 inbound_modem
 resample_test
+
+# Test sounds
+*.snd
