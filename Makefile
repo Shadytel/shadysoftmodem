@@ -30,11 +30,16 @@ ALL_COMPILED_OBJS := $(MODEM_PATH)/modem_cmdline.o $(MODEM_OBJS) $(DP_OBJS) \
 %.o: %.cc
 	$(CC) $(CXXFLAGS) -c -o $@ $^
 
+all: inbound_modem resample_test
+
 inbound_modem: inbound_modem.o $(MODEM_PATH)/dsplibs.o $(ALL_COMPILED_OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
+resample_test: resample_test.o $(RESAMPLE_OBJS)
+	$(CC) $(CXXFLAGS) -o $@ $^
+
 clean:
-	rm -f inbound_modem inbound_modem.o $(ALL_COMPILED_OBJS)
+	rm -f inbound_modem inbound_modem.o resample_test resample_test.o $(ALL_COMPILED_OBJS)
 .PHONY:
 	clean
 
