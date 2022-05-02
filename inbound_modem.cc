@@ -1,5 +1,7 @@
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <unistd.h>
 
@@ -10,11 +12,23 @@ extern "C" {
 #define delete _delete
 #include "modem.h"
 #undef delete
-}
+
+/* modem init externals : FIXME remove it */
+extern int  dp_dummy_init(void);
+extern void dp_dummy_exit(void);
+extern int  dp_sinus_init(void);
+extern void dp_sinus_exit(void);
+extern int  prop_dp_init(void);
+extern void prop_dp_exit(void);
+extern int datafile_load_info(char *name,struct dsp_info *info);
+extern int datafile_save_info(char *name,struct dsp_info *info);
+extern int modem_ring_detector_start(struct modem *m);
 
 #include "resample.h"
+}
 
 typedef struct {
+    struct modem * modem;
     ResamplerState in_resamp_state;
     ResamplerState out_resamp_state;
 } ExtModModem;
@@ -23,18 +37,23 @@ FILE *logFile;
 
 static int yate_extmod_modem_start(struct modem *m)
 {
+    ExtModModem * t = (ExtModModem *)m->dev_data;
+    resamp_16khz_9k6hz_init(&t->in_resamp_state);
+	resamp_9k6hz_16khz_init(&t->out_resamp_state);
+    fprintf(logFile, "yate_extmod_modem_start\n");
     return 0;
 }
 
 static int yate_extmod_modem_stop(struct modem *m)
 {
+    fprintf(logFile, "yate_extmod_modem_stop\n");
     return 0;
 }
 
 static int yate_extmod_modem_ioctl(struct modem *m, unsigned int cmd, unsigned long arg)
 {
 	ExtModModem * t = (ExtModModem *)m->dev_data;
-	//DBG("modem_test_ioctl: cmd %x, arg %lx...\n",cmd,arg);
+	fprintf(logFile, "yate_extmod_modem_ioctl: cmd %x, arg %lx...\n", cmd, arg);
     switch (cmd) {
     case MDMCTL_CAPABILITIES:
         return -1;
@@ -61,10 +80,11 @@ struct modem_driver yate_extmod_modem_driver = {
         .ioctl = yate_extmod_modem_ioctl,
 };
 
-int create_pty() {
+int init_modem(ExtModModem *m) {
     struct termios termios;
+    char * pty_name;
     int pty;
-
+    
     pty = getpt();
     if (pty < 0 || grantpt(pty) < 0 || unlockpt(pty) < 0) {
         fprintf(logFile, "Error creating pty: %s\n", strerror(errno));
@@ -81,6 +101,18 @@ int create_pty() {
             strerror(errno));
         return errno;
     }
+
+    fcntl(pty, F_SETFL, O_NONBLOCK);
+
+    pty_name = ptsname(pty);
+
+    m->modem = modem_create(&yate_extmod_modem_driver, pty_name);
+    m->modem->dev_data = (void *)m;
+
+    m->modem->pty = pty;
+    m->modem->pty_name = pty_name;
+
+    modem_update_termios(m->modem, &termios);
 
     return 0;
 }
@@ -102,8 +134,14 @@ int main(int argc, char *argv[]) {
     fd_set out_fds;
     fd_set err_fds;
     std::string in_msg;
+    ExtModModem modem;
 
     logFile = fopen("/tmp/inbound_modem_dbg.log", "wt");
+
+    dp_dummy_init();
+	dp_sinus_init();
+	prop_dp_init();
+	modem_timer_init();
 
     for (;;) {
         FD_ZERO(&in_fds);
@@ -155,6 +193,7 @@ int main(int argc, char *argv[]) {
 
         // Echo audio back
         if (FD_ISSET(3, &in_fds)) {
+            //len = read(3, buf, 4)
             len = read(3, buf, sizeof(buf));
             if (len <= 0) {
                 return -4;
