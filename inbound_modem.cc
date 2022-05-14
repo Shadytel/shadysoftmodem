@@ -192,7 +192,7 @@ int main(int argc, char *argv[]) {
             FD_SET(i, &err_fds);
         }
         
-        if (select(modem.modem->pty, &in_fds, NULL, &err_fds, NULL) <= 0) {
+        if (select(modem.modem->pty + 1, &in_fds, NULL, &err_fds, NULL) <= 0) {
             return -1;
         }
 
