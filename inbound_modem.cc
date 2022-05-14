@@ -1,8 +1,11 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <iostream>
@@ -153,6 +156,8 @@ int main(int argc, char *argv[]) {
     std::string in_msg;
     ExtModModem modem;
     struct termios termios;
+    int child;
+    char * const prgArgv[] = { "incoming-pppd", NULL, "connect", "chat /home/shadyyate/pppd.chat", NULL };
 
     /*
     logFile = fopen("/tmp/inbound_modem_dbg.log", "wt");
@@ -169,11 +174,21 @@ int main(int argc, char *argv[]) {
 
     init_modem(&modem);
 
+    child = fork();
+    if (!child) {
+        int pty = open(modem.modem->pty_name, O_RDWR);
+        dup2(pty, 0);
+        dup2(pty, 1);
+        dup2(pty, 2);
+        execv("/home/supersat/incoming-pppd", prgArgv);
+        return 0;
+    }
+
     //fprintf(logFile, "Modem pty is fd %d\n", modem.modem->pty);
 
     modem_write(modem.modem, ans, sizeof(ans));
 
-    for (;;) {
+    while (!waitpid(child, NULL, WNOHANG)) {
         if (modem.modem->event) {
             modem_event(modem.modem);
         }
@@ -195,7 +210,7 @@ int main(int argc, char *argv[]) {
         FD_SET(modem.modem->pty, &err_fds);
 
         if (select(modem.modem->pty + 1, &in_fds, NULL, &err_fds, NULL) <= 0) {
-            return -1;
+            break;
         }
 
         /*
@@ -209,14 +224,14 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i <= modem.modem->pty; i++) {
             if (FD_ISSET(i, &err_fds)) {
                 fprintf(stderr, "fd %d is exceptional\n", i);
-                return -2;
+                break;
             }
         }
 
         if (FD_ISSET(0, &in_fds)) {
             len = read(0, buf, sizeof(buf));
             if (len <= 0) {
-                return -3;
+                break;
             }
             //fwrite(buf, 1, len, logFile);
             for (int i = 0; i < len; i++) {
@@ -231,7 +246,7 @@ int main(int argc, char *argv[]) {
         if (FD_ISSET(3, &in_fds)) {
             len = read(3, buf, sizeof(buf));
             if (len <= 0) {
-                return -4;
+                break;
             }
             if (modem.active) {
                 /*
@@ -265,6 +280,7 @@ int main(int argc, char *argv[]) {
             //fprintf(logFile, "Writing %d samples (%d bytes) back to YATE\n", numSamples, numSamples * 2);
             if (write(4, buf, numSamples * 2) != numSamples * 2) {
                 fprintf(stderr, "can't write the entire outgoing buffer!\n");
+                break;
             }
         }
 
@@ -286,6 +302,8 @@ int main(int argc, char *argv[]) {
             }
         }
     }
+
+    kill(child, SIGHUP);
 
     dp_dummy_exit();
 	dp_sinus_exit();
