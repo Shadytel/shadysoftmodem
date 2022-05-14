@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
     int len;
     int numSamples;
     char buf[4096];
-    char ans[] = "ATA\n";
+    char ans[] = "AT+MS=212\nATA\n";
     samp_t inSampleBuf[sizeof(buf) / 2];
     samp_t outSampleBuf[sizeof(buf) / 2];
     fd_set in_fds;
