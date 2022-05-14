@@ -34,11 +34,13 @@ typedef struct {
     ResamplerState out_resamp_state;
 } ExtModModem;
 
+/*
 FILE *logFile;
 FILE *inSamples;
 FILE *outSamples;
 FILE *inResamples;
 FILE *outResamples;
+*/
 
 static int yate_extmod_modem_start(struct modem *m)
 {
@@ -46,7 +48,7 @@ static int yate_extmod_modem_start(struct modem *m)
     t->active = 1;
     resamp_8khz_9k6hz_init(&t->in_resamp_state);
 	resamp_9k6hz_8khz_init(&t->out_resamp_state);
-    fprintf(logFile, "yate_extmod_modem_start\n");
+    //fprintf(logFile, "yate_extmod_modem_start\n");
     return 0;
 }
 
@@ -54,14 +56,14 @@ static int yate_extmod_modem_stop(struct modem *m)
 {
     ExtModModem * t = (ExtModModem *)m->dev_data;
     t->active = 0;
-    fprintf(logFile, "yate_extmod_modem_stop\n");
+    //fprintf(logFile, "yate_extmod_modem_stop\n");
     return 0;
 }
 
 static int yate_extmod_modem_ioctl(struct modem *m, unsigned int cmd, unsigned long arg)
 {
 	ExtModModem * t = (ExtModModem *)m->dev_data;
-	fprintf(logFile, "yate_extmod_modem_ioctl: cmd %x, arg %lx...\n", cmd, arg);
+	//fprintf(logFile, "yate_extmod_modem_ioctl: cmd %x, arg %lx...\n", cmd, arg);
     switch (cmd) {
     case MDMCTL_CAPABILITIES:
         return -1;
@@ -95,7 +97,7 @@ int init_modem(ExtModModem *m) {
     
     pty = getpt();
     if (pty < 0 || grantpt(pty) < 0 || unlockpt(pty) < 0) {
-        fprintf(logFile, "Error creating pty: %s\n", strerror(errno));
+        fprintf(stderr, "Error creating pty: %s\n", strerror(errno));
         return errno;
     }
 
@@ -105,7 +107,7 @@ int init_modem(ExtModModem *m) {
     cfsetospeed(&termios, B115200);
 
     if (tcsetattr(pty, TCSANOW, &termios)) {
-        fprintf(logFile, "Error creating pty in tcsetattr: %s\n",
+        fprintf(stderr, "Error creating pty in tcsetattr: %s\n",
             strerror(errno));
         return errno;
     }
@@ -151,11 +153,13 @@ int main(int argc, char *argv[]) {
     std::string in_msg;
     ExtModModem modem;
 
+    /*
     logFile = fopen("/tmp/inbound_modem_dbg.log", "wt");
     inSamples = fopen("/tmp/inbound_modem_in.snd", "wb");
     outSamples = fopen("/tmp/inbound_modem_out.snd", "wb");
     inResamples = fopen("/tmp/inbound_modem_in_resamp.snd", "wb");
     outResamples = fopen("/tmp/inbound_modem_out_resamp.snd", "wb");
+    */
 
     dp_dummy_init();
 	dp_sinus_init();
@@ -164,7 +168,7 @@ int main(int argc, char *argv[]) {
 
     init_modem(&modem);
 
-    fprintf(logFile, "Modem pty is fd %d\n", modem.modem->pty);
+    //fprintf(logFile, "Modem pty is fd %d\n", modem.modem->pty);
 
     modem_write(modem.modem, ans, sizeof(ans));
 
@@ -192,6 +196,7 @@ int main(int argc, char *argv[]) {
             return -1;
         }
 
+        /*
         for (int i = 0; i < modem.modem->pty; i++) {
             if (FD_ISSET(i, &in_fds) && i != 3) {
                 fprintf(logFile, "fd %d is ready to read\n", i);
@@ -204,13 +209,14 @@ int main(int argc, char *argv[]) {
                 return -2;
             }
         }
+        */
 
         if (FD_ISSET(0, &in_fds)) {
             len = read(0, buf, sizeof(buf));
             if (len <= 0) {
                 return -3;
             }
-            fwrite(buf, 1, len, logFile);
+            //fwrite(buf, 1, len, logFile);
             for (int i = 0; i < len; i++) {
                 in_msg.push_back(buf[i]);
                 if (buf[i] == '\n') {
@@ -226,38 +232,44 @@ int main(int argc, char *argv[]) {
                 return -4;
             }
             if (modem.active) {
+                /*
                 if (len % 2) {
                     fprintf(logFile, "read an odd number of bytes!! (%d)\n", len);
                 }
                 fwrite(buf, 1, len, inSamples);
+                */
                 numSamples = (sizeof(inSampleBuf) / 2) -
                     resample(&modem.in_resamp_state, (int16_t *)buf, len / 2,
                     inSampleBuf, sizeof(inSampleBuf) / 2);
+                /*
                 fprintf(logFile, "Received %d bytes (%d samples), resampled to %d samples\n",
                     len, len / 2, numSamples);
                 fwrite(inSampleBuf, 2, numSamples, inResamples);
+                */
                 modem_process(modem.modem, inSampleBuf, outSampleBuf, numSamples);
-                fwrite(outSampleBuf, 2, numSamples, outSamples);
+                //fwrite(outSampleBuf, 2, numSamples, outSamples);
                 numSamples = (sizeof(buf) / 2) - 
                     resample(&modem.out_resamp_state, outSampleBuf, numSamples,
                     (int16_t *)buf, sizeof(buf) / 2);
+                /*
                 fprintf(logFile, "upconverted modem samples to %d\n", numSamples);
                 fwrite(buf, 2, numSamples, outResamples);
+                */
             } else {
                 // Return silence
                 memset(buf, 0, len);
                 numSamples = len / 2;
             }
-            fprintf(logFile, "Writing %d samples (%d bytes) back to YATE\n", numSamples, numSamples * 2);
+            //fprintf(logFile, "Writing %d samples (%d bytes) back to YATE\n", numSamples, numSamples * 2);
             if (write(4, buf, numSamples * 2) != numSamples * 2) {
-                fprintf(logFile, "can't write the entire outgoing buffer!\n");
+                fprintf(stderr, "can't write the entire outgoing buffer!\n");
             }
         }
 
         if (FD_ISSET(modem.modem->pty, &in_fds)) {
             len = read(modem.modem->pty, buf, sizeof(buf) - 1);
             buf[len] = 0;
-            fprintf(logFile, "Read from pty: %s\n", buf);
+            //fprintf(logFile, "Read from pty: %s\n", buf);
             modem_write(modem.modem, buf, len);
         }
     }
