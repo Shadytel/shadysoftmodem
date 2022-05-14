@@ -152,6 +152,7 @@ int main(int argc, char *argv[]) {
     fd_set err_fds;
     std::string in_msg;
     ExtModModem modem;
+    struct termios termios;
 
     /*
     logFile = fopen("/tmp/inbound_modem_dbg.log", "wt");
@@ -193,7 +194,7 @@ int main(int argc, char *argv[]) {
         }
         
         if (select(modem.modem->pty + 1, &in_fds, NULL, &err_fds, NULL) <= 0) {
-            return -1;
+            break;
         }
 
         /*
@@ -267,10 +268,24 @@ int main(int argc, char *argv[]) {
         }
 
         if (FD_ISSET(modem.modem->pty, &in_fds)) {
-            len = read(modem.modem->pty, buf, sizeof(buf) - 1);
-            buf[len] = 0;
-            //fprintf(logFile, "Read from pty: %s\n", buf);
-            modem_write(modem.modem, buf, len);
+            tcgetattr(modem.modem->pty, &termios);
+			if (memcmp(&termios, &modem.modem->termios, sizeof(termios))) {
+				modem_update_termios(modem.modem, &termios);
+			}
+            len = modem.modem->xmit.size - modem.modem->xmit.count;
+            if (len == 0) {
+                continue;
+            }
+            if (len > sizeof(buf)) {
+                len = sizeof(buf);
+            }
+            len = read(modem.modem->pty, buf, len);
+            if (len) {
+                modem_write(modem.modem, buf, len);
+            } else {
+                // ???
+                break;
+            }
         }
     }
 
