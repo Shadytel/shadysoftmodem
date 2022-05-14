@@ -43,8 +43,8 @@ static int yate_extmod_modem_start(struct modem *m)
 {
     ExtModModem * t = (ExtModModem *)m->dev_data;
     t->active = 1;
-    resamp_16khz_9k6hz_init(&t->in_resamp_state);
-	resamp_9k6hz_16khz_init(&t->out_resamp_state);
+    resamp_8khz_9k6hz_init(&t->in_resamp_state);
+	resamp_9k6hz_8khz_init(&t->out_resamp_state);
     fprintf(logFile, "yate_extmod_modem_start\n");
     return 0;
 }
@@ -142,8 +142,8 @@ int main(int argc, char *argv[]) {
     int numSamples;
     char buf[4096];
     char ans[] = "ATA\n";
-    samp_t inSampleBuf[sizeof(buf) / sizeof(samp_t)];
-    samp_t outSampleBuf[sizeof(buf) / sizeof(samp_t)];
+    samp_t inSampleBuf[sizeof(buf) / 2];
+    samp_t outSampleBuf[sizeof(buf) / 2];
     fd_set in_fds;
     fd_set out_fds;
     fd_set err_fds;
@@ -227,23 +227,26 @@ int main(int argc, char *argv[]) {
                 if (len % 2) {
                     fprintf(logFile, "read an odd number of bytes!! (%d)\n", len);
                 }
-                numSamples = (sizeof(inSampleBuf) / sizeof(samp_t)) - 
+                fwrite(buf, 1, len, inSamples);
+                numSamples = (sizeof(inSampleBuf) / 2) -
                     resample(&modem.in_resamp_state, (int16_t *)buf, len / 2,
-                    inSampleBuf, sizeof(inSampleBuf) / sizeof(samp_t));
-                fprintf(logFile, "Exchanging %d bytes, converted to %d samples\n", len, numSamples);
+                    inSampleBuf, sizeof(inSampleBuf) / 2);
+                fprintf(logFile, "Received %d bytes (%d samples), resampled to %d samples\n",
+                    len, len / 2, numSamples);
                 fwrite(inSampleBuf, 2, numSamples, inSamples);
                 modem_process(modem.modem, inSampleBuf, outSampleBuf, numSamples);
                 fwrite(outSampleBuf, 2, numSamples, outSamples);
-                numSamples = (sizeof(buf) / sizeof(samp_t)) - 
+                numSamples = (sizeof(buf) / 2) - 
                     resample(&modem.out_resamp_state, outSampleBuf, numSamples,
-                    (int16_t *)buf, sizeof(buf) / sizeof(samp_t));
+                    (int16_t *)buf, sizeof(buf) / 2);
                 fprintf(logFile, "upconverted modem samples to %d\n", numSamples);
                 fwrite(buf, 2, numSamples, outResamples);
             } else {
                 // Return silence
                 memset(buf, 0, len);
                 numSamples = len / 2;
-            }           
+            }
+            fprintf(logFile, "Writing %d samples (%d bytes) back to YATE\n", numSamples, numSamples * 2);
             if (write(4, buf, numSamples * 2) != numSamples * 2) {
                 fprintf(logFile, "can't write the entire outgoing buffer!\n");
             }
