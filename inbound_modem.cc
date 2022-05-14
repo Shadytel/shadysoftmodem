@@ -37,6 +37,7 @@ typedef struct {
 FILE *logFile;
 FILE *inSamples;
 FILE *outSamples;
+FILE *inResamples;
 FILE *outResamples;
 
 static int yate_extmod_modem_start(struct modem *m)
@@ -153,6 +154,7 @@ int main(int argc, char *argv[]) {
     logFile = fopen("/tmp/inbound_modem_dbg.log", "wt");
     inSamples = fopen("/tmp/inbound_modem_in.snd", "wb");
     outSamples = fopen("/tmp/inbound_modem_out.snd", "wb");
+    inResamples = fopen("/tmp/inbound_modem_in_resamp.snd", "wb");
     outResamples = fopen("/tmp/inbound_modem_out_resamp.snd", "wb");
 
     dp_dummy_init();
@@ -233,7 +235,7 @@ int main(int argc, char *argv[]) {
                     inSampleBuf, sizeof(inSampleBuf) / 2);
                 fprintf(logFile, "Received %d bytes (%d samples), resampled to %d samples\n",
                     len, len / 2, numSamples);
-                fwrite(inSampleBuf, 2, numSamples, inSamples);
+                fwrite(inSampleBuf, 2, numSamples, inResamples);
                 modem_process(modem.modem, inSampleBuf, outSampleBuf, numSamples);
                 fwrite(outSampleBuf, 2, numSamples, outSamples);
                 numSamples = (sizeof(buf) / 2) - 
