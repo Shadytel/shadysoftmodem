@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 typedef struct {
-    int32_t * taps;
+    const float * taps;
     int16_t * history;
     size_t historyIdx;
     size_t samplesPerPhase;
