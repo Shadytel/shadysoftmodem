@@ -192,9 +192,10 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < 5; i++) {
             FD_SET(i, &err_fds);
         }
-        
+        FD_SET(modem.modem->pty, &err_fds);
+
         if (select(modem.modem->pty + 1, &in_fds, NULL, &err_fds, NULL) <= 0) {
-            break;
+            return -1;
         }
 
         /*
@@ -203,14 +204,14 @@ int main(int argc, char *argv[]) {
                 fprintf(logFile, "fd %d is ready to read\n", i);
             }
         }
+        */
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i <= modem.modem->pty; i++) {
             if (FD_ISSET(i, &err_fds)) {
-                fprintf(logFile, "fd %d is exceptional\n", i);
+                fprintf(stderr, "fd %d is exceptional\n", i);
                 return -2;
             }
         }
-        */
 
         if (FD_ISSET(0, &in_fds)) {
             len = read(0, buf, sizeof(buf));
@@ -280,11 +281,8 @@ int main(int argc, char *argv[]) {
                 len = sizeof(buf);
             }
             len = read(modem.modem->pty, buf, len);
-            if (len) {
+            if (len > 0) {
                 modem_write(modem.modem, buf, len);
-            } else {
-                // ???
-                break;
             }
         }
     }
