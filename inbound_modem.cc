@@ -156,7 +156,6 @@ int main(int argc, char *argv[]) {
     int len;
     int numSamples;
     char buf[4096];
-    char ans[] = "AT+MS=212\nATA\n";
     samp_t inSampleBuf[sizeof(buf) / 2];
     samp_t outSampleBuf[sizeof(buf) / 2];
     fd_set in_fds;
@@ -165,9 +164,8 @@ int main(int argc, char *argv[]) {
     std::string in_msg;
     ExtModModem modem;
     struct termios termios;
-    int child;
-    char * const prgArgv[] = { "incoming-pppd", NULL, "connect", "chat /home/shadyyate/pppd.chat", NULL };
-
+    int child = 0;
+    
 #ifdef DEBUG_LOG
     logFile = fopen("/tmp/inbound_modem_dbg.log", "wt");
 #endif
@@ -186,21 +184,26 @@ int main(int argc, char *argv[]) {
 
     init_modem(&modem);
 
-    child = fork();
-    if (!child) {
-        int pty = open(modem.modem->pty_name, O_RDWR);
-        dup2(pty, 0);
-        dup2(pty, 1);
-        dup2(pty, 2);
-        execv("/home/supersat/incoming-pppd", prgArgv);
-        return 0;
+    if (argc > 2) {
+        // If a program is specified as a command line argument, then we run
+        // the command with the pty name as the argument.
+        const char * const prgArgv[3] = { argv[2], modem.modem->pty_name, NULL };
+        child = fork();
+
+        if (!child) {
+            int pty = open(modem.modem->pty_name, O_RDWR);
+            dup2(pty, 0);
+            dup2(pty, 1);
+            dup2(pty, 2);
+            // The const-ness is probably safe to case away here since we've fork()ed
+            execv(argv[2], (char * const *)prgArgv);
+            return 0;
+        }
     }
 
     DLPRINTF("Modem pty is fd %d\n", modem.modem->pty);
 
-    modem_write(modem.modem, ans, sizeof(ans));
-
-    while (!waitpid(child, NULL, WNOHANG)) {
+    while (!child || !waitpid(child, NULL, WNOHANG)) {
         if (modem.modem->event) {
             modem_event(modem.modem);
         }
