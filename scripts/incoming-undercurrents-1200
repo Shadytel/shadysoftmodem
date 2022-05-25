@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# https://stackoverflow.com/a/246128
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )"
+
+chat -v -f $SCRIPT_DIR/modem-v22bis-answer.script && $SCRIPT_DIR/undercurrents.expect
