@@ -35,6 +35,7 @@ typedef struct {
     int active;
     ResamplerState in_resamp_state;
     ResamplerState out_resamp_state;
+    int delay;
 } ExtModModem;
 
 #ifdef DEBUG_LOG
@@ -58,6 +59,8 @@ static int yate_extmod_modem_start(struct modem *m)
 {
     ExtModModem * t = (ExtModModem *)m->dev_data;
     t->active = 1;
+    //t->delay = 0;
+    t->delay = 256; // 160 sample buffer from YATE, 96 sample jitter buffer from ATA
     resamp_8khz_9k6hz_init(&t->in_resamp_state);
 	resamp_9k6hz_8khz_init(&t->out_resamp_state);
     DLPRINTF("yate_extmod_modem_start, rate = %d\n", m->srate);
@@ -89,7 +92,8 @@ static int yate_extmod_modem_ioctl(struct modem *m, unsigned int cmd, unsigned l
     case MDMCTL_CODECTYPE:
         return CODEC_UNKNOWN;
     case MDMCTL_IODELAY:
-		return 0; // FIXME?
+        DLPRINTF(" ... delay = %d\n", t->delay);
+		return t->delay; // FIXME?
     default:
         return 0;
     }
@@ -155,6 +159,7 @@ typedef int16_t samp_t;
 int main(int argc, char *argv[]) {
     int len;
     int numSamples;
+    int skipSamples;
     char buf[4096];
     samp_t inSampleBuf[sizeof(buf) / 2];
     samp_t outSampleBuf[sizeof(buf) / 2];
@@ -184,19 +189,25 @@ int main(int argc, char *argv[]) {
 
     init_modem(&modem);
 
-    if (argc > 2) {
+    if (argc > 1) {
         // If a program is specified as a command line argument, then we run
         // the command with the pty name as the argument.
-        const char * const prgArgv[3] = { argv[2], modem.modem->pty_name, NULL };
+
+        int attach_pty = strstr(argv[0], "attach") >= 0;
+
+        const char * const prgName = argv[1];
+        const char * const prgArgv[3] = { prgName, modem.modem->pty_name, NULL };
         child = fork();
 
         if (!child) {
-            int pty = open(modem.modem->pty_name, O_RDWR);
-            dup2(pty, 0);
-            dup2(pty, 1);
-            dup2(pty, 2);
+            if (attach_pty) {
+                int pty = open(modem.modem->pty_name, O_RDWR);
+                dup2(pty, 0);
+                dup2(pty, 1);
+                dup2(pty, 2);
+            }
             // The const-ness is probably safe to case away here since we've fork()ed
-            execv(argv[2], (char * const *)prgArgv);
+            execv(argv[1], (char * const *)prgArgv);
             return 0;
         }
     }
@@ -273,12 +284,28 @@ int main(int argc, char *argv[]) {
                     resample(&modem.in_resamp_state, (int16_t *)buf, len / 2,
                     inSampleBuf, sizeof(inSampleBuf) / 2);
                 
-                DLPRINTF("Received %d bytes (%d samples), resampled to %d samples\n",
-                    len, len / 2, numSamples);
+                DLPRINTF("Received %d bytes (%d samples), resampled to %d samples (ud = %d)\n",
+                    len, len / 2, numSamples, modem.modem->update_delay);
                 SFWRITE(inSampleBuf, 2, numSamples, inResamples);
                 
-                modem_process(modem.modem, inSampleBuf, outSampleBuf, numSamples);
-                
+                skipSamples = 0;
+                if (modem.modem->update_delay < 0) {
+				    if ( -modem.modem->update_delay >= len / 2) {
+					    DLPRINTF("change delay -%d...\n", len / 2);
+					    modem.delay -= len / 2;
+					    modem.modem->update_delay += len / 2;
+					    continue;
+				    }
+
+                    DLPRINTF("change delay %d...\n", modem.modem->update_delay);
+                    skipSamples = modem.modem->update_delay;
+                    numSamples += skipSamples; // skipSamples is negative here
+				    modem.delay += modem.modem->update_delay;
+                    modem.modem->update_delay = 0;
+                }
+
+                modem_process(modem.modem, inSampleBuf - skipSamples, outSampleBuf, numSamples);
+
                 SFWRITE(outSampleBuf, 2, numSamples, outSamples);
                 
                 numSamples = (sizeof(buf) / 2) - 
@@ -299,6 +326,24 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "can't write the entire outgoing buffer!\n");
                 break;
             }
+
+            if (modem.modem->update_delay > 0) {
+				DLPRINTF("change delay +%d...\n", modem.modem->update_delay);
+                len = modem.modem->update_delay * 2;
+                if (len > sizeof(buf)) {
+                    DLPRINTF("Delay change required %d bytes, only %d available\n",
+                        len, sizeof(buf));
+                    len = sizeof(buf);
+                }
+                memset(buf, 0, len);
+                if (write(4, buf, len) != len) {
+                    fprintf(stderr, "can't write the entire outgoing delay buffer!\n");
+                    break;
+                }
+
+			    modem.delay += modem.modem->update_delay;
+			    modem.modem->update_delay = 0;
+			}
         }
 
         if (FD_ISSET(modem.modem->pty, &in_fds)) {
