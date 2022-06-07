@@ -3,8 +3,7 @@
 
 int main(int argc, char *argv[]) {
     ResamplerState state;
-    //resamp_9k6hz_16khz_init(&state);
-    resamp_16khz_9k6hz_init(&state);
+    resamp_8khz_9k6hz_init(&state);
     int16_t inBuf[256];
     int16_t outBuf[512];
 
