@@ -30,10 +30,13 @@ ALL_COMPILED_OBJS := $(MODEM_PATH)/modem_cmdline.o $(MODEM_OBJS) $(DP_OBJS) \
 %.o: %.cc
 	$(CC) $(CXXFLAGS) -c -o $@ $^
 
-all: inbound_modem resample_test
+all: inbound_modem inbound_modem_attach resample_test
 
 inbound_modem: inbound_modem.o $(MODEM_PATH)/dsplibs.o $(ALL_COMPILED_OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
+
+inbound_modem_attach:
+	ln -s inbound_modem inbound_modem_attach
 
 resample_test: resample_test.o $(RESAMPLE_OBJS)
 	$(CC) $(CXXFLAGS) -o $@ $^
