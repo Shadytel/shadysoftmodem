@@ -1,10 +1,13 @@
 CC = gcc
 CXX = g++
-RESAMPLE_OBJS = resample.o
+RESAMPLE_OBJS = \
+	audio-resampler/biquad.o \
+	audio-resampler/decimator.o \
+	audio-resampler/resampler.o
 
 MODEM_PATH=pkg-sl-modem/modem
 
-CFLAGS += -Wall -g -O -I. -I$(MODEM_PATH) -DCONFIG_DEBUG_MODEM -m32 -DDEBUG_LOG -DDEBUG_SAMPLES
+CFLAGS += -Wall -g -O -I. -I$(MODEM_PATH) -Iaudio-resampler -DCONFIG_DEBUG_MODEM -m32 -DDEBUG_LOG -DDEBUG_SAMPLES
 CXXFLAGS += $(CFLAGS)
 
 MODEM_OBJS := \
@@ -30,7 +33,7 @@ ALL_COMPILED_OBJS := $(MODEM_PATH)/modem_cmdline.o $(MODEM_OBJS) $(DP_OBJS) \
 %.o: %.cc
 	$(CC) $(CXXFLAGS) -c -o $@ $^
 
-all: inbound_modem inbound_modem_attach resample_test
+all: inbound_modem inbound_modem_attach # resample_test
 
 inbound_modem: inbound_modem.o $(MODEM_PATH)/dsplibs.o $(ALL_COMPILED_OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
@@ -38,8 +41,8 @@ inbound_modem: inbound_modem.o $(MODEM_PATH)/dsplibs.o $(ALL_COMPILED_OBJS)
 inbound_modem_attach:
 	ln -s inbound_modem inbound_modem_attach
 
-resample_test: resample_test.o $(RESAMPLE_OBJS)
-	$(CC) $(CXXFLAGS) -o $@ $^
+# resample_test: resample_test.o $(RESAMPLE_OBJS)
+# 	$(CC) $(CXXFLAGS) -o $@ $^
 
 clean:
 	rm -f inbound_modem inbound_modem.o resample_test resample_test.o $(ALL_COMPILED_OBJS)

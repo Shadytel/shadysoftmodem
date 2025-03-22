@@ -27,14 +27,14 @@ extern int datafile_load_info(char *name,struct dsp_info *info);
 extern int datafile_save_info(char *name,struct dsp_info *info);
 extern int modem_ring_detector_start(struct modem *m);
 
-#include "resample.h"
+#include "resampler.h"
 }
 
 typedef struct {
     struct modem * modem;
     int active;
-    ResamplerState in_resamp_state;
-    ResamplerState out_resamp_state;
+    Resample * in_resamp_state;
+    Resample * out_resamp_state;
     int delay;
 } ExtModModem;
 
@@ -61,8 +61,10 @@ static int yate_extmod_modem_start(struct modem *m)
     t->active = 1;
     //t->delay = 0;
     t->delay = 256; // 160 sample buffer from YATE, 96 sample jitter buffer from ATA
-    resamp_8khz_9k6hz_init(&t->in_resamp_state);
-	resamp_9k6hz_8khz_init(&t->out_resamp_state);
+
+    t->in_resamp_state = resampleInit(1, 16, 16, 9600.0 / 8000.0, 0);
+    t->out_resamp_state = resampleInit(1, 16, 16, 8000.0 / 9600.0, 0);
+
     DLPRINTF("yate_extmod_modem_start, rate = %d\n", m->srate);
     return 0;
 }
@@ -156,6 +158,18 @@ void process_msg(std::string & in_msg) {
 
 typedef int16_t samp_t;
 
+void convert_to_float(float * out, samp_t * in, int len) {
+    for (int i = 0; i < len; i++) {
+        out[i] = (float)in[i] / 32768.0f;
+    }
+}
+
+void convert_to_int16(samp_t * out, float * in, int len) {
+    for (int i = 0; i < len; i++) {
+        out[i] = (samp_t)(in[i] * 32768.0f);
+    }
+}
+
 int main(int argc, char *argv[]) {
     int len;
     int numSamples;
@@ -163,6 +177,11 @@ int main(int argc, char *argv[]) {
     char buf[4096];
     samp_t inSampleBuf[sizeof(buf) / 2];
     samp_t outSampleBuf[sizeof(buf) / 2];
+    float resampleInBuf[sizeof(buf) / 4];
+    float resampleOutBuf[sizeof(buf) / 4];
+    float * resampleInBufs[] = { resampleInBuf };
+    float * resampleOutBufs[] = { resampleOutBuf };
+    ResampleResult rr;
     fd_set in_fds;
     fd_set out_fds;
     fd_set err_fds;
@@ -280,9 +299,11 @@ int main(int argc, char *argv[]) {
                 }
                 SFWRITE(buf, 1, len, inSamples);
 
-                numSamples = (sizeof(inSampleBuf) / 2) -
-                    resample(&modem.in_resamp_state, (int16_t *)buf, len / 2,
-                    inSampleBuf, sizeof(inSampleBuf) / 2);
+                convert_to_float(resampleInBuf, (int16_t *)buf, len / 2);
+                rr = resampleProcess(modem.in_resamp_state, resampleInBufs, len / 2,
+                    resampleOutBufs, sizeof(resampleOutBuf) / 4, 9600.0 / 8000.0);
+                numSamples = rr.output_generated;
+                convert_to_int16(inSampleBuf, resampleOutBuf, numSamples);
 
                 DLPRINTF("Received %d bytes (%d samples), resampled to %d samples (ud = %d)\n",
                     len, len / 2, numSamples, modem.modem->update_delay);
@@ -304,13 +325,16 @@ int main(int argc, char *argv[]) {
                     modem.modem->update_delay = 0;
                 }
 
+                // skipSamples is either 0 or negative here
                 modem_process(modem.modem, inSampleBuf - skipSamples, outSampleBuf, numSamples);
 
                 SFWRITE(outSampleBuf, 2, numSamples, outSamples);
 
-                numSamples = (sizeof(buf) / 2) -
-                    resample(&modem.out_resamp_state, outSampleBuf, numSamples,
-                    (int16_t *)buf, sizeof(buf) / 2);
+                convert_to_float(resampleInBuf, outSampleBuf, numSamples);
+                rr = resampleProcess(modem.out_resamp_state, resampleInBufs, numSamples,
+                    resampleOutBufs, sizeof(resampleOutBuf) / 4, 8000.0 / 9600.0);
+                numSamples = rr.output_generated;
+                convert_to_int16((samp_t *)buf, resampleOutBuf, numSamples);
 
                 DLPRINTF("upconverted modem samples to %d\n", numSamples);
                 SFWRITE(buf, 2, numSamples, outResamples);
@@ -330,7 +354,7 @@ int main(int argc, char *argv[]) {
             if (modem.modem->update_delay > 0) {
 				DLPRINTF("change delay +%d...\n", modem.modem->update_delay);
                 len = modem.modem->update_delay * 2;
-                if (len > sizeof(buf)) {
+                if (len > (int)sizeof(buf)) {
                     DLPRINTF("Delay change required %d bytes, only %d available\n",
                         len, sizeof(buf));
                     len = sizeof(buf);
@@ -355,7 +379,7 @@ int main(int argc, char *argv[]) {
             if (len == 0) {
                 continue;
             }
-            if (len > sizeof(buf)) {
+            if (len > (int)sizeof(buf)) {
                 len = sizeof(buf);
             }
             len = read(modem.modem->pty, buf, len);

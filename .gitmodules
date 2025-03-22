@@ -1,3 +1,6 @@
 [submodule "pkg-sl-modem"]
 	path = pkg-sl-modem
 	url = git@github.com:Shadytel/pkg-sl-modem.git
+[submodule "audio-resampler"]
+	path = audio-resampler
+	url = https://github.com/dbry/audio-resampler.git
