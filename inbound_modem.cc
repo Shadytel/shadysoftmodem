@@ -328,22 +328,26 @@ int main(int argc, char *argv[]) {
             }
 
             if (modem.modem->update_delay > 0) {
-				DLPRINTF("change delay +%d...\n", modem.modem->update_delay);
-                len = modem.modem->update_delay * 2;
-                if (len > sizeof(buf)) {
+		DLPRINTF("change delay +%d...\n", modem.modem->update_delay);
+                skipSamples = modem.modem->update_delay;
+                if (2*skipSamples > sizeof(outSampleBuf)) {
                     DLPRINTF("Delay change required %d bytes, only %d available\n",
-                        len, sizeof(buf));
-                    len = sizeof(buf);
+                        2*skipSamples, sizeof(outSampleBuf));
+                    skipSamples = sizeof(outSampleBuf)/2;
                 }
-                memset(buf, 0, len);
-                if (write(4, buf, len) != len) {
+                memset(outSampleBuf, 0, 2*skipSamples);
+                numSamples = (sizeof(buf) / 2) -
+                    resample(&modem.out_resamp_state, outSampleBuf, skipSamples,
+                    (int16_t *)buf, sizeof(buf) / 2);
+                DLPRINTF("...writing %d delay change samples\n", numSamples);
+                if (write(4, buf, 2*numSamples) != 2*numSamples) {
                     fprintf(stderr, "can't write the entire outgoing delay buffer!\n");
                     break;
                 }
 
-			    modem.delay += modem.modem->update_delay;
-			    modem.modem->update_delay = 0;
-			}
+		modem.delay += skipSamples;
+		modem.modem->update_delay -=skipSamples;
+	    }
         }
 
         if (FD_ISSET(modem.modem->pty, &in_fds)) {
