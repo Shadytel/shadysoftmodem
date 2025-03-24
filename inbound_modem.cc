@@ -328,7 +328,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (modem.modem->update_delay > 0) {
-		DLPRINTF("change delay +%d...\n", modem.modem->update_delay);
+                DLPRINTF("change delay +%d...\n", modem.modem->update_delay);
                 skipSamples = modem.modem->update_delay;
                 if (2*skipSamples > sizeof(outSampleBuf)) {
                     DLPRINTF("Delay change required %d bytes, only %d available\n",
@@ -345,9 +345,9 @@ int main(int argc, char *argv[]) {
                     break;
                 }
 
-		modem.delay += skipSamples;
-		modem.modem->update_delay -=skipSamples;
-	    }
+                modem.delay += skipSamples;
+                modem.modem->update_delay -=skipSamples;
+            }
         }
 
         if (FD_ISSET(modem.modem->pty, &in_fds)) {
